@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.quotes import calculate_quotes
 from src.sanctions import screen_recipient
+from src.banks import KNOWN_BANKS, validate_account_format
 
 app = FastAPI(title="RUB -> PKR Remittance Optimizer")
 
@@ -18,6 +19,7 @@ app.add_middleware(
 # ---------- In-memory storage (resets when server restarts — fine for demo) ----------
 alerts_storage = []
 locked_rate_storage = None
+recipients_storage = []
 
 
 def get_current_rate():
@@ -40,6 +42,12 @@ class AlertRequest(BaseModel):
 
 class LockRateRequest(BaseModel):
     rate: float
+
+class RecipientRequest(BaseModel):
+    name: str
+    bank_name: str
+    account_number: str
+    country: str = "PK" 
 
 
 # ---------- Existing routes ----------
@@ -139,3 +147,64 @@ def get_locked_rate():
         locked_rate_storage = None
         return {"locked": False, "message": "Previous locked rate expired."}
     return {"locked": True, **locked_rate_storage}
+
+@app.get("/api/rates/locked")
+def get_locked_rate():
+    global locked_rate_storage
+    if locked_rate_storage is None:
+        return {"locked": False}
+    expires = datetime.datetime.fromisoformat(locked_rate_storage["expires_at"])
+    if datetime.datetime.now() > expires:
+        locked_rate_storage = None
+        return {"locked": False, "message": "Previous locked rate expired."}
+    return {"locked": True, **locked_rate_storage}
+
+
+# ---------- NEW: Recipient management routes ----------
+
+@app.post("/api/recipients")
+def create_recipient(request: RecipientRequest):
+    if not request.name.strip():
+        raise HTTPException(status_code=400, detail="Recipient name is required.")
+    if not request.bank_name.strip():
+        raise HTTPException(status_code=400, detail="Bank name is required.")
+    if not request.account_number.strip():
+        raise HTTPException(status_code=400, detail="Account number is required.")
+
+    # Validate account format against bank's expected pattern
+    format_check = validate_account_format(request.bank_name, request.account_number)
+    if not format_check["valid"]:
+        raise HTTPException(status_code=400, detail=format_check["reason"])
+
+    # Screen the recipient immediately against sanctions list
+    screening = screen_recipient(request.bank_name, request.country)
+    recipient = {
+        "id": str(uuid.uuid4())[:8],
+        "name": request.name,
+        "bank_name": request.bank_name,
+        "account_number": request.account_number,
+        "country": request.country,
+        "screening": screening,
+        "created_at": datetime.datetime.now().isoformat(),
+    }
+    recipients_storage.append(recipient)
+    return {"success": True, "recipient": recipient}
+
+
+@app.get("/api/recipients")
+def list_recipients():
+    return {"recipients": recipients_storage, "count": len(recipients_storage)}
+
+
+@app.delete("/api/recipients/{recipient_id}")
+def delete_recipient(recipient_id: str):
+    for i, r in enumerate(recipients_storage):
+        if r["id"] == recipient_id:
+            recipients_storage.pop(i)
+            return {"success": True, "message": f"Recipient {recipient_id} deleted."}
+    raise HTTPException(status_code=404, detail="Recipient not found.")
+
+# ---------- NEW: Bank list endpoint ----------
+@app.get("/api/banks")
+def list_banks():
+    return {"banks": KNOWN_BANKS}

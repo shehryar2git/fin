@@ -13,7 +13,7 @@ function App() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // NEW: Rate alert state
+  // Rate alert state
   const [currentRate, setCurrentRate] = useState(3.2552);
   const [targetRate, setTargetRate] = useState(3.30);
   const [direction, setDirection] = useState('above');
@@ -21,10 +21,25 @@ function App() {
   const [alertMessage, setAlertMessage] = useState('');
   const [lockedRate, setLockedRate] = useState(null);
 
-  // Fetch current alerts on page load and every 10 seconds
+  // NEW: Recipient state
+  const [recipients, setRecipients] = useState([]);
+  const [banks, setBanks] = useState([]);
+  const [newRecipient, setNewRecipient] = useState({
+    name: '',
+    bank_name: '',
+    account_number: '',
+    country: 'PK'
+  });
+  const [recipientMessage, setRecipientMessage] = useState('');
+  const [selectedRecipient, setSelectedRecipient] = useState(null);
+  const selectedBank = banks.find(b => b.name === newRecipient.bank_name);
+
+  // Load alerts, locked rate, and recipients on page load
   useEffect(() => {
     fetchAlerts();
     fetchLockedRate();
+    fetchRecipients();
+    fetchBanks();
     const interval = setInterval(fetchAlerts, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -34,19 +49,33 @@ function App() {
       const res = await axios.get(`${API}/api/alerts`);
       setAlerts(res.data.alerts);
       setCurrentRate(res.data.current_rate);
-    } catch (err) {
-      console.error('Failed to fetch alerts');
-    }
+    } catch (err) { console.error('Failed to fetch alerts'); }
   };
 
   const fetchLockedRate = async () => {
     try {
       const res = await axios.get(`${API}/api/rates/locked`);
       setLockedRate(res.data.locked ? res.data : null);
-    } catch (err) {
-      console.error('Failed to fetch locked rate');
-    }
+    } catch (err) { console.error('Failed to fetch locked rate'); }
   };
+
+  const fetchRecipients = async () => {
+    try {
+      const res = await axios.get(`${API}/api/recipients`);
+      setRecipients(res.data.recipients);
+    } catch (err) { console.error('Failed to fetch recipients'); }
+  };
+
+  const fetchBanks = async () => {
+  try {
+    const res = await axios.get(`${API}/api/banks`);
+    const bankList = Object.entries(res.data.banks).map(([code, info]) => ({
+      code,
+      ...info
+    }));
+    setBanks(bankList);
+  } catch (err) { console.error('Failed to fetch banks'); }
+};
 
   const createAlert = async () => {
     setAlertMessage('');
@@ -66,9 +95,7 @@ function App() {
     try {
       await axios.delete(`${API}/api/alerts/${id}`);
       fetchAlerts();
-    } catch (err) {
-      setAlertMessage('Failed to delete alert.');
-    }
+    } catch (err) { setAlertMessage('Failed to delete alert.'); }
   };
 
   const lockCurrentRate = async () => {
@@ -76,9 +103,37 @@ function App() {
       await axios.post(`${API}/api/rates/lock`, { rate: currentRate });
       setAlertMessage(`🔒 Locked in rate ${currentRate} for 24 hours`);
       fetchLockedRate();
-    } catch (err) {
-      setAlertMessage('Failed to lock rate.');
+    } catch (err) { setAlertMessage('Failed to lock rate.'); }
+  };
+
+  // ---- NEW: Recipient actions ----
+  const addRecipient = async () => {
+    setRecipientMessage('');
+    if (!newRecipient.name || !newRecipient.bank_name || !newRecipient.account_number) {
+      setRecipientMessage('Please fill in all fields.');
+      return;
     }
+    try {
+      const res = await axios.post(`${API}/api/recipients`, newRecipient);
+      const screening = res.data.recipient.screening;
+      if (screening.cleared) {
+        setRecipientMessage(`✅ ${newRecipient.name} saved and cleared screening.`);
+      } else {
+        setRecipientMessage(`⚠️ ${newRecipient.name} saved but FLAGGED: ${screening.reason}`);
+      }
+      setNewRecipient({ name: '', bank_name: '', account_number: '', country: 'PK' });
+      fetchRecipients();
+    } catch (err) {
+      setRecipientMessage(err.response?.data?.detail || 'Failed to add recipient.');
+    }
+  };
+
+  const removeRecipient = async (id) => {
+    try {
+      await axios.delete(`${API}/api/recipients/${id}`);
+      if (selectedRecipient?.id === id) setSelectedRecipient(null);
+      fetchRecipients();
+    } catch (err) { setRecipientMessage('Failed to delete recipient.'); }
   };
 
   // ---- Existing quote/transfer logic ----
@@ -100,15 +155,16 @@ function App() {
 
   const executeTransfer = async () => {
     if (!selectedProvider) return setMessage('Please select a provider first.');
+    if (!selectedRecipient) return setMessage('Please select a recipient.');
     if (!confirmed) return setMessage('You must check the confirmation box.');
 
     try {
       const response = await axios.post(`${API}/api/transfer`, {
         quote_id: selectedProvider.provider_id,
         user_confirmed: true,
-        recipient_bank: "Standard Bank"
+        recipient_bank: selectedRecipient.bank_name
       });
-      setMessage(`✅ Success! Transaction ID: ${response.data.transaction_id}`);
+      setMessage(`✅ Success! Sent to ${selectedRecipient.name}. Transaction ID: ${response.data.transaction_id}`);
     } catch (error) {
       setMessage(error.response?.data?.detail || 'Transfer failed.');
     }
@@ -116,8 +172,11 @@ function App() {
 
   return (
     <div className="container">
-      <h1>RUB → PKR Remittance Optimizer</h1>
+      <h1>Ahmed's RUB → PKR Rem Optimizer</h1>
       <p className="subtitle">AI-powered comparison for Pakistani students in Russia</p>
+            <p className="credit-line">
+        © 2026 Shehryar Ahmed· Higher School of Economics, Moscow
+      </p>
 
       {/* ---------- RATE ALERT PANEL ---------- */}
       <div className="rate-panel">
@@ -172,7 +231,91 @@ function App() {
         )}
       </div>
 
-      {/* ---------- EXISTING QUOTE SECTION ---------- */}
+      {/* ---------- RECIPIENTS PANEL ---------- */}
+      <div className="recipients-panel">
+        <h2>Saved Recipients</h2>
+
+               <div className="recipient-form">
+          <input
+            type="text"
+            placeholder="Name"
+            value={newRecipient.name}
+            onChange={(e) => setNewRecipient({ ...newRecipient, name: e.target.value })}
+          />
+          <select
+            value={newRecipient.bank_name}
+            onChange={(e) => setNewRecipient({ ...newRecipient, bank_name: e.target.value })}
+            className="bank-select"
+          >
+            <option value="">-- Select Bank --</option>
+            {banks.map((bank) => (
+              <option key={bank.code} value={bank.name}>{bank.name}</option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder={selectedBank ? selectedBank.example : "Account Number"}
+            value={newRecipient.account_number}
+            onChange={(e) => setNewRecipient({ ...newRecipient, account_number: e.target.value })}
+            className={
+              newRecipient.account_number === '' ? '' :
+              (selectedBank && new RegExp(selectedBank.pattern).test(newRecipient.account_number))
+                ? 'input-valid'
+                : 'input-invalid'
+            }
+          />
+          <button onClick={addRecipient}>+ Add Recipient</button>
+        </div>
+
+        {selectedBank && (
+          <div className="bank-format-hint">
+            <strong>Format for {selectedBank.name}:</strong> {selectedBank.format_hint}
+            <br />
+            <em>Example: {selectedBank.example}</em>
+          </div>
+        )}
+
+{selectedBank && (
+  <div className="bank-format-hint">
+    <strong>Format for {selectedBank.name}:</strong> {selectedBank.format_hint}
+    <br />
+    <em>Example: {selectedBank.example}</em>
+  </div>
+)}
+        {recipientMessage && <p className="recipient-message">{recipientMessage}</p>}
+
+        {recipients.length > 0 ? (
+          <div className="recipients-list">
+            {recipients.map((r) => (
+              <div
+                key={r.id}
+                className={`recipient-row ${r.screening.cleared ? 'cleared' : 'flagged'} ${selectedRecipient?.id === r.id ? 'selected-recipient' : ''}`}
+                onClick={() => setSelectedRecipient(r)}
+              >
+                <div className="recipient-info">
+                  <strong>{r.name}</strong>
+                  <span>{r.bank_name} • {r.account_number}</span>
+                </div>
+                <div className="recipient-status">
+                  {r.screening.cleared ? (
+                    <span className="status-ok">✅ Cleared</span>
+                  ) : (
+                    <span className="status-flagged">⚠️ Flagged</span>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeRecipient(r.id); }}
+                    className="delete-btn"
+                  >✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="no-recipients">No recipients saved yet. Add one above.</p>
+        )}
+      </div>
+
+      {/* ---------- QUOTE SECTION ---------- */}
       <div className="input-section">
         <label>Amount in RUB:</label>
         <input
@@ -229,7 +372,7 @@ function App() {
                 checked={confirmed}
                 onChange={(e) => setConfirmed(e.target.checked)}
               />
-              I confirm this transfer (required)
+              I confirm this transfer to {selectedRecipient?.name || '[select recipient]'} (required)
             </label>
             <button onClick={executeTransfer} className="execute-btn">
               Execute Transfer
