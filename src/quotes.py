@@ -1,4 +1,4 @@
-from providers import PROVIDERS, MID_MARKET_RATE
+from src.providers import PROVIDERS, MID_MARKET_RATE
 
 def calculate_quotes(amount_rub: float) -> list:
     quotes = []
