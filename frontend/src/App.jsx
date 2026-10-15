@@ -275,13 +275,6 @@ function App() {
           </div>
         )}
 
-{selectedBank && (
-  <div className="bank-format-hint">
-    <strong>Format for {selectedBank.name}:</strong> {selectedBank.format_hint}
-    <br />
-    <em>Example: {selectedBank.example}</em>
-  </div>
-)}
         {recipientMessage && <p className="recipient-message">{recipientMessage}</p>}
 
         {recipients.length > 0 ? (
