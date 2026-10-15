@@ -1,50 +1,25 @@
-┌──────────────────────────────────────────────────────────────┐
-│ Browser (localhost:5173) │
-│ │
-│ ┌────────────────────────────────────────────────────┐ │
-│ │ React Frontend (App.jsx) │ │
-│ │ │ │
-│ │ Rate Panel │ Recipients Panel │ Quote Table │ │
-│ └──────────────────────┬─────────────────────────────┘ │
-│ │ │
-└──────────────────────────┼────────────────────────────────────┘
-│ HTTP / REST (axios)
-│ CORS-enabled
-▼
-┌──────────────────────────────────────────────────────────────┐
-│ Backend (localhost:8000) │
-│ │
-│ ┌─────────────────────────────────────────────────────┐ │
-│ │ FastAPI Application (main.py) │ │
-│ │ │ │
-│ │ ┌──────────────┐ ┌──────────────┐ ┌───────────┐ │ │
-│ │ │ /api/ │ │ /api/ │ │ /api/ │ │ │
-│ │ │ quotes │ │ alerts │ │ rates │ │ │
-│ │ └──────┬───────┘ └──────┬───────┘ └─────┬─────┘ │ │
-│ │ │ │ │ │ │
-│ │ ▼ ▼ ▼ │ │
-│ │ ┌──────────────┐ ┌──────────────┐ ┌───────────┐ │ │
-│ │ │ quotes.py │ │ alerts_ │ │ rate │ │ │
-│ │ │ │ │ storage │ │ locking │ │ │
-│ │ └──────┬───────┘ └──────────────┘ └───────────┘ │ │
-│ │ │ │ │
-│ │ ▼ │ │
-│ │ ┌──────────────┐ ┌──────────────┐ ┌───────────┐ │ │
-│ │ │ providers.py │ │ sanctions.py │ │ banks.py │ │ │
-│ │ │ │ │ (4-layer) │ │ (14 banks)│ │ │
-│ │ └──────────────┘ └──────────────┘ └───────────┘ │ │
-│ └─────────────────────────────────────────────────────┘ │
-│ │
-└──────────────────────────────────────────────────────────────┘
-│
-▼
-┌─────────────┐
-│ data/ │
-│ (JSON) │
-└─────────────┘
-
-text
-
+Browser (localhost:5173)
+   |
+   |  React Frontend (App.jsx)
+   |  - Rate Panel | Recipients Panel | Quote Table
+   |
+   |  HTTP/REST via axios
+   v
+Backend (localhost:8000)
+   |
+   |  FastAPI Application (main.py)
+   |  Routes: /api/quotes | /api/alerts | /api/rates | /api/transfer | /api/recipients
+   |
+   |-- quotes.py      (quote calculation)
+   |-- sanctions.py   (4-layer screening)
+   |-- banks.py       (14 verified banks)
+   |
+   v
+data/ (JSON persistence)
+   |-- alerts.json
+   |-- recipients.json
+   +-- locked_rate.json
+   
 ### 2.2 Component Descriptions
 
 **Frontend (React + Vite)**
@@ -570,26 +545,5 @@ Vite	Fast build tool and dev server for modern web projects
 Document prepared by: Shehryar Ahmed & Azhar Shah
 Date: October 15, 2026
 Version: 1.0
-Contact: ahmedfromhse@gmail.com
-
-text
-
-### Step 6: Paste Into the Editor
-
-Click inside the empty `technical-documentation.md` editor. Press **Ctrl + V**.
-
-**What you should see:** The full technical documentation appears in the editor.
-
-### Step 7: Save
-
-Press **Ctrl + S**.
-
-The dot (●) next to the filename should disappear.
-
-### Step 8: Verify the File Is Complete
-
-Press **Ctrl + End** to jump to the bottom.
-
-You should see:
 Contact: ahmedfromhse@gmail.com
 
