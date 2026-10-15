@@ -1,7 +1,21 @@
+# Python
 __pycache__/
 *.pyc
-.env
 .venv/
+.env
+
+# Node
 node_modules/
+frontend/node_modules/
+
+# Test data (do not commit)
+data/
+test_*.json
+*_format.json
+blocked.json
+recipient.json
+alert.json
+
+# OS
 .DS_Store
-*.json
+Thumbs.db
