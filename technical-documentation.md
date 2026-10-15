@@ -1,3 +1,4 @@
+```
 Browser (localhost:5173)
    |
    |  React Frontend (App.jsx)
@@ -19,7 +20,8 @@ data/ (JSON persistence)
    |-- alerts.json
    |-- recipients.json
    +-- locked_rate.json
-   
+```
+
 ### 2.2 Component Descriptions
 
 **Frontend (React + Vite)**
